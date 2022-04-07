@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html> 
+ <head>
+    <title>Processing.JS inside Webpages: Template</title>
+    <Style>
+        body {background-color: rgb(9, 9, 44)}
+        #div{
+           margin: auto;
+        }
+        h1{
+            color: white;
+            text-align: center;
+        }
+        h2{
+            color: white;
+            text-align: center;
+        }
+        p{
+            color:white;
+            text-align: center;
+            line-height: 1.5em;
+        }
+    </Style>
+</head>
+ <body>
+   <h1>GPS simulation - Antallet af forbunde satellitter</h1>
+   <h2>Lavet af: Mikkel Teller, Rosborg Gymnasium</h2>
+   <p>GPS-modtageren er illustreret som den røde prik, der bevæger sig tilfældigt rundt på Jordens overflade.<br>
+    GPS-satellitternes baner er en smule simplificeret. Blandt andet fordi satellitterne er jævnt fordelt i deres baneplan.<br>
+    Histogrammet i bunden viser den procentvise fordeling af, hvor mange satellitter modtageren har haft forbindelse til med en <em>elevationsmaske</em> på 15°.<br>
+    Modtageren har altid forbindelse til mindst 4 satellitter, men ofte flere.</p>
+    <div id="div">
+    <p align="center"> 
+      <canvas id="mycanvas"></canvas> 
+    </p>
+   </div>
+ </body>
+ 
+ <script src="https://cdn.jsdelivr.net/processing.js/1.4.8/processing.min.js"></script> 
+
+ <script>
+    var sketchProc = function(processingInstance) {
+     with (processingInstance) {
+        //"Programvinduets" størrelse og udseende
+        var appStr = 750;
+        size(appStr, appStr);
+        frameRate(30);
+        background(255,255,255);
+
+//Selve programmet ________________________________________________________________________________________________________________________
+var rJorden = 63.71;
+var rSat = 265.55;
+var satStr = 5;
+var modStr = 5;
+var synligVinkelGrader = 15;
+var synligVinkel = synligVinkelGrader*(PI/180);
+var synligDist = (rSat/(sin(0.5*PI+synligVinkel)))*sin((PI-(0.5*PI+synligVinkel))-asin(rJorden*((sin(0.5*PI+synligVinkel))/rSat)));
+
+/*
+Funktionen laver en "satellit" på baggrund af:
+r: satelittens afstand til Jordens centrum
+i: inklination
+bp: hvilket baneplan satelitten er i
+t0: hvilken tid satelitten starter i -> så kan der være satelitter flere forskellige steder i samme baneplan
+*/
+var Sat = function(r, i, bp, t0){
+   this.r = r;
+   this.i = i;
+   this.bp = bp;
+   this.t0 = t0;
+   this.bpRad = bp*(PI/180); 
+   this.iRad = i*(PI/180);
+}
+
+//Funktion: Beregn en satellits position efter x minutter
+Sat.prototype.posCalc = function(tidMin){
+   var t = (tidMin+this.t0) * (2 * PI)/(60 * 12)
+   this.bp = this.bp//-tid*(2 * PI)/(60 * 12)
+   this.x = this.r * (-sin(this.bpRad)*cos(t)-cos(this.bpRad)*cos(this.iRad)*sin(t));
+   this.y = this.r * -(cos(this.bpRad)*cos(t)-sin(this.bpRad)*cos(this.iRad)*sin(t));
+   this.z = this.r * (sin(this.iRad)*sin(t));
+   this.dist = sqrt(pow(this.x-mod.x,2)+pow(this.y-mod.y,2)+pow(this.z-mod.z,2));
+}
+
+//Funktion: Vis satellitten på skærmen som en prik, hvor y-værdien er repræsenteret som prikkens størrelse.
+Sat.prototype.vis = function(){
+   ellipse((width/2)+this.x, (height/2)+this.z, map(this.y, -this.r, this.r, satStr, satStr*3), map(this.y, -this.r, this.r, satStr, satStr*3));
+   //textSize(15);
+   //text(round(this.dist), (width/2)+this.x, (height/2)+this.z); 
+}
+
+//Tællevariabel og array med sattelitter defineres
+var num = 0;
+var satellitter = [];
+
+//Konstruering af de 24 satelitter
+for(var i = 0; i < 6; i++){
+   for(var j = 0; j < 4; j++){
+      satellitter[num] = new Sat(rSat, 55, 60*i+j*17, 180*j);
+      num++;
+   }
+}
+
+//GPS modtager på Jorden der bevæger sig tilfældigt rundt
+var Modtager = function (){
+}
+var mod = new Modtager();
+
+//Funktion der beregner GPS modtagerens position - u og t er variable der ændres løbende
+Modtager.prototype.pos = function(){
+   this.x = rJorden * sin(u)*cos(t);
+   this.y = rJorden * sin(u)*sin(t);
+   this.z = rJorden * cos(u);
+}
+
+//u og t defineres
+var u = 2;
+var t = 0;
+
+//Funktion der viser GPS modtageren som en prik
+Modtager.prototype.vis = function(){
+   fill(255,0,0,255);
+   if(this.y<0){
+      fill(255,0,0,150);
+   }
+   ellipse((width/2)+this.x,(height/2)+this.z,map(this.y, -rJorden, rJorden, modStr,modStr*2),map(this.y, -rJorden, rJorden, modStr,modStr*2));
+}
+
+//Denne funktion sorterer listen med satelitter efter afstanden mellem GPS-modtageren og satellitten 
+//-> Den satellit med kortest afstand til GPS-modtageren er først på listen
+function sortSat(){
+   satellitter.sort((a, b)=>{   
+      return a.dist - b.dist;
+   });
+}
+
+//Histogram
+var antalFor = [];
+var antalSøjler = 14;
+for(var i = 0; i < satellitter.length; i++){
+   antalFor[i] = 0;
+}
+function histogram(){
+   for(var i = 0; i < antalSøjler; i++){
+      fill(100, 100, 100);
+      stroke(0,0,0);
+      rect(5+((i*width)/(antalSøjler)),height-((antalFor[i]-1)/tid)*100, (width/(antalSøjler))-5, 100*(antalFor[i]-1)/tid);
+      fill(0,0,0);
+      text(i,(i*width)/(antalSøjler)+23,height-2);
+   }
+   textSize(15);
+   stroke(0,0,0,100);
+   line(0,650,750,650);
+   text("100%", 5,645);
+   line(0,700,750,700);
+   text("50%", 5,695);
+}
+
+ 
+
+//En varibalen for tid defineres
+var tid = 0;
+
+draw = function(){
+   var tæller = 0;
+   //baggrund, tekst og Jorden
+   noStroke();
+   background(255,255,255);
+   fill(50,50,150);
+   textSize(25);
+   text("Tid i minutter: " + tid, 20,50);
+   fill(0,150,0);
+   ellipse(width/2, height/2,rJorden*2,rJorden*2);
+   //modtager
+   fill(0,0,0);
+   u += map(noise(tid*0.01),0,1,-0.1,0.1);
+   t += map(noise(tid*-0.01),0,1,-0.1,0.1);
+   mod.pos();
+   mod.vis();
+   //satellitter
+   for(var i = 0; i < satellitter.length; i++){
+      satellitter[i].posCalc(tid);
+      fill(50,50,150);
+      if(satellitter[i].y<0 && sqrt(pow(satellitter[i].x,2) + pow(satellitter[i].z,2))<rJorden){
+         fill(50,50,150,100);
+      }
+      satellitter[i].vis();
+      if(satellitter[i].dist < synligDist){
+         stroke(0,0,0);
+         line((width/2)+mod.x,(height/2)+mod.z, (width/2)+satellitter[i].x, (height/2)+satellitter[i].z);
+         noStroke();
+         tæller++;
+      }
+   }
+   //Satellitterne sorteres i listen efter afstand til GPS-modtageren
+   //Der tegnes en streg mellem GPS modtageren og de fire satelitter tættest på
+   /*
+   sortSat();
+   for(var i = 0; i < 4; i++){
+      strokeWeight(1);
+      stroke(0,0,0);
+      line((width/2)+mod.x,(height/2)+mod.z, (width/2)+satellitter[i].x, (height/2)+satellitter[i].z);
+      
+   }
+   */
+   antalFor[tæller]++;
+   histogram();
+   tid++;
+}
+    }};
+
+    var canvas = document.getElementById("mycanvas"); 
+    var processingInstance = new Processing(canvas, sketchProc); 
+ </script>
+
+</html>
