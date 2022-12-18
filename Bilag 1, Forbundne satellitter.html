@@ -192,17 +192,7 @@ draw = function(){
          tæller++;
       }
    }
-   //Satellitterne sorteres i listen efter afstand til GPS-modtageren
-   //Der tegnes en streg mellem GPS modtageren og de fire satelitter tættest på
-   /*
-   sortSat();
-   for(var i = 0; i < 4; i++){
-      strokeWeight(1);
-      stroke(0,0,0);
-      line((width/2)+mod.x,(height/2)+mod.z, (width/2)+satellitter[i].x, (height/2)+satellitter[i].z);
-      
-   }
-   */
+ 
    antalFor[tæller]++;
    histogram();
    tid++;
